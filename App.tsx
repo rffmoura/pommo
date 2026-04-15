@@ -11,19 +11,24 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import { SettingsProvider } from './src/store/SettingsContext';
 import { requestNotificationPermissions, setupNotificationChannels } from './src/utils/notifications';
 import { COLORS } from './src/utils/theme';
-
+import Feather from '@expo/vector-icons/Feather'
 const Tab = createBottomTabNavigator();
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   const icons: Record<string, string> = {
-    Timer: '◉',
-    Histórico: '≡',
-    Configurações: '⊙',
+    Timer: 'clock',
+    Histórico: 'list',
+    Configurações: 'settings',
   };
+
+  const iconName = (icons[name] ?? 'help-circle') as any;
+
   return (
-    <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.45, color: focused ? COLORS.focusAccent : '#fff' }}>
-      {icons[name] ?? '●'}
-    </Text>
+    <Feather
+      name={iconName}
+      size={20}
+      color={focused ? COLORS.focusAccent : 'rgba(255,255,255,0.4)'}
+    />
   );
 }
 

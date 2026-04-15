@@ -28,6 +28,7 @@ interface UseTimerReturn {
   resume: () => void;
   reset: () => void;
   skipToRest: () => void;
+  finishRest: () => void;
 }
 
 export function useTimer({
@@ -181,6 +182,16 @@ export function useTimer({
     await cancelAllNotifications();
   }, [clearTimer, focusMinutes]);
 
+  // Ends the rest phase early without discarding the already-saved focus record
+  const finishRest = useCallback(async () => {
+    clearTimer();
+    setStatus('idle');
+    setPhase('idle');
+    setSecondsLeft(focusMinutes * 60);
+    pausedSecondsLeftRef.current = focusMinutes * 60;
+    await cancelAllNotifications();
+  }, [clearTimer, focusMinutes]);
+
   const skipToRest = useCallback(async () => {
     clearTimer();
     await cancelAllNotifications();
@@ -250,5 +261,5 @@ export function useTimer({
 
   const progress = 1 - secondsLeft / totalSeconds;
 
-  return { phase, status, secondsLeft, totalSeconds, progress, start, pause, resume, reset, skipToRest };
+  return { phase, status, secondsLeft, totalSeconds, progress, start, pause, resume, reset, skipToRest, finishRest };
 }

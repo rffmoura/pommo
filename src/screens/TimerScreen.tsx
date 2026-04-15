@@ -15,6 +15,8 @@ import { TimerRing } from '../components/TimerRing';
 import { useTimer, TimerPhase } from '../hooks/useTimer';
 import { useSettings } from '../store/SettingsContext';
 import { COLORS } from '../utils/theme';
+import { Feather } from '@expo/vector-icons';
+import Entypo from '@expo/vector-icons/Entypo';
 
 const { width } = Dimensions.get('window');
 const RING_SIZE = width * 0.72;
@@ -26,9 +28,8 @@ function formatTime(seconds: number): string {
 }
 
 function phaseLabel(phase: TimerPhase): string {
-  if (phase === 'focus') return 'FOCO';
   if (phase === 'rest') return 'DESCANSO';
-  return 'PRONTO';
+  return 'FOCO';
 }
 
 interface TimerScreenProps {
@@ -48,10 +49,10 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
 
   const handlePhaseComplete = useCallback((phase: TimerPhase) => {
     if (phase === 'focus') {
-      showToast('🎉 Pomodoro concluído!');
+      showToast('Pomodoro concluído!');
       onRecordAdded?.();
     } else {
-      showToast('✅ Descanso concluído!');
+      showToast('Descanso concluído!');
     }
   }, [onRecordAdded, showToast]);
 
@@ -97,13 +98,11 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.appName}>pommo</Text>
-          {(isFocus || isRest) && (
-            <View style={[styles.phaseBadge, { backgroundColor: accentColor + '30', borderColor: accentColor + '60' }]}>
-              <Text style={[styles.phaseBadgeText, { color: accentColor }]}>
-                {phaseLabel(timer.phase)}
-              </Text>
-            </View>
-          )}
+          <View style={[styles.phaseBadge, { backgroundColor: accentColor + '30', borderColor: accentColor + '60' }]}>
+            <Text style={[styles.phaseBadgeText, { color: accentColor }]}>
+              {phaseLabel(timer.phase)}
+            </Text>
+          </View>
         </View>
 
         {/* Ring + Timer — ocupa o espaço flex, toast flutua sobre ele */}
@@ -116,20 +115,14 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
             />
             <View style={[styles.ringInner, { width: RING_SIZE, height: RING_SIZE }]}>
               <Text style={styles.timerText}>{formatTime(displaySeconds)}</Text>
-              <Text style={styles.timerLabel}>
-                {isIdle
-                  ? `${settings.focusMinutes} min de foco`
-                  : isFocus
-                  ? 'tempo de foco'
-                  : 'tempo de descanso'}
-              </Text>
             </View>
           </View>
 
           {/* Toast absoluto dentro do timerArea — não afeta o layout */}
-          {toastMessage && (
+          {!toastMessage && (
             <View style={styles.toast} pointerEvents="none">
-              <Text style={styles.toastText}>{toastMessage}</Text>
+              {/* <Text style={styles.toastText}>{toastMessage}</Text> */}
+              <Text style={styles.toastText}>Pomodoro Conluido!</Text>
             </View>
           )}
         </View>
@@ -142,7 +135,8 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
               onPress={timer.start}
               activeOpacity={0.8}
             >
-              <Text style={styles.primaryButtonText}>▶  Iniciar</Text>
+              <Entypo name="controller-play" size={18} color="#fff" style={{ marginRight: 10 }} />
+              <Text style={styles.primaryButtonText}>Iniciar</Text>
             </TouchableOpacity>
           )}
 
@@ -152,7 +146,19 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
               onPress={handleStop}
               activeOpacity={0.8}
             >
-              <Text style={styles.stopButtonText}>■  Parar</Text>
+              <Entypo name="controller-stop" size={16} color="rgba(255,255,255,0.55)" style={{ marginRight: 8 }} />
+              <Text style={styles.primaryButtonText}>Parar</Text>
+            </TouchableOpacity>
+          )}
+
+          {isRest && isRunning && (
+            <TouchableOpacity
+              style={styles.stopButton}
+              onPress={timer.finishRest}
+              activeOpacity={0.8}
+            >
+              <Feather name="check-circle" size={16} color="rgba(255,255,255,0.55)" style={{ marginRight: 8 }} />
+              <Text style={styles.stopButtonText}>Encerrar descanso</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -160,7 +166,7 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
         {/* Sessions info */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            {settings.focusMinutes}m foco · {settings.restMinutes}m descanso
+            {settings.focusMinutes}min foco · {settings.restMinutes}min descanso
           </Text>
         </View>
       </View>
@@ -232,7 +238,7 @@ const styles = StyleSheet.create({
   },
   toast: {
     position: 'absolute',
-    top: 6,
+    top: 20,
     alignSelf: 'center',
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 16,
@@ -251,11 +257,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
   primaryButton: {
+    flexDirection: 'row',
     paddingHorizontal: 40,
     paddingVertical: 16,
     borderRadius: 50,
     alignItems: 'center',
+    justifyContent: 'center',
     minWidth: 160,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -263,17 +277,13 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
   stopButton: {
+    flexDirection: 'row',
     paddingHorizontal: 36,
     paddingVertical: 14,
     borderRadius: 50,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.18)',
     backgroundColor: 'rgba(255,255,255,0.06)',
