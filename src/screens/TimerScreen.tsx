@@ -119,10 +119,9 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
           </View>
 
           {/* Toast absoluto dentro do timerArea — não afeta o layout */}
-          {!toastMessage && (
+          {toastMessage && (
             <View style={styles.toast} pointerEvents="none">
-              {/* <Text style={styles.toastText}>{toastMessage}</Text> */}
-              <Text style={styles.toastText}>Pomodoro Conluido!</Text>
+              <Text style={styles.toastText}>{toastMessage}</Text>
             </View>
           )}
         </View>
@@ -240,12 +239,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: COLORS.restAccent + '30',
     borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: COLORS.restAccent + '60',
   },
   toastText: {
     color: '#fff',
