@@ -89,7 +89,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderTopWidth: 0,
     elevation: 0,
-    height: Platform.OS === 'ios' ? 80 : 64,
+    height: Platform.OS === 'ios' ? 88 : 72,
+    paddingTop: 10,
     paddingBottom: Platform.OS === 'ios' ? 24 : 8,
   },
   tabBarLabel: {
