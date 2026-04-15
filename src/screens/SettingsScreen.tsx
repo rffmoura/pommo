@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '../store/SettingsContext';
 import { COLORS } from '../utils/theme';
 
-const FOCUS_OPTIONS = [15, 20, 25, 30, 45, 50, 60];
+const FOCUS_OPTIONS = [1, 20, 25, 30, 45, 50, 60];
 const REST_OPTIONS = [3, 5, 10, 15, 20];
 
 interface OptionButtonProps {

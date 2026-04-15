@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,14 @@ import {
   StatusBar,
   RefreshControl,
   Alert,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -64,6 +71,8 @@ export default function HistoryScreen() {
   const [groups, setGroups] = useState<DayGroup[]>([]);
   const [totalToday, setTotalToday] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
+  const todayKey = useRef(new Date().toISOString().slice(0, 10));
 
   const loadRecords = useCallback(async () => {
     const records = await getRecords();
@@ -72,9 +81,11 @@ export default function HistoryScreen() {
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([dayKey, recs]) => ({ dayKey, records: recs }));
     setGroups(sorted);
+    setTotalToday(grouped[todayKey.current]?.length ?? 0);
 
-    const todayKey = new Date().toISOString().slice(0, 10);
-    setTotalToday(grouped[todayKey]?.length ?? 0);
+    // Collapse all past days by default
+    const pastDays = new Set(sorted.map((g) => g.dayKey).filter((k) => k !== todayKey.current));
+    setCollapsedDays(pastDays);
   }, []);
 
   useFocusEffect(
@@ -108,6 +119,21 @@ export default function HistoryScreen() {
     );
   }, []);
 
+  const toggleDay = useCallback((dayKey: string) => {
+    if (dayKey === todayKey.current) return; // today is always open
+    LayoutAnimation.configureNext({
+      duration: 250,
+      create: { type: 'easeInEaseOut', property: 'opacity' },
+      update: { type: 'easeInEaseOut' },
+      delete: { type: 'easeInEaseOut', property: 'opacity' },
+    });
+    setCollapsedDays((prev) => {
+      const next = new Set(prev);
+      next.has(dayKey) ? next.delete(dayKey) : next.add(dayKey);
+      return next;
+    });
+  }, []);
+
   const renderRecord = useCallback(({ item, index }: { item: PomodoroRecord; index: number }) => (
     <View style={styles.recordRow}>
       <View style={styles.recordDot} />
@@ -123,25 +149,36 @@ export default function HistoryScreen() {
 
   const renderDay = useCallback(({ item }: { item: DayGroup }) => {
     const totalMinutes = item.records.reduce((sum, r) => sum + r.durationMinutes, 0);
+    const isCollapsed = collapsedDays.has(item.dayKey);
+    const isToday = item.dayKey === todayKey.current;
     return (
-    <View style={styles.dayGroup}>
-      <View style={styles.dayHeader}>
-        <Text style={styles.dayLabel}>{formatDayLabel(item.dayKey)}</Text>
-        <View style={styles.dayHeaderRight}>
-          <View style={styles.dayTime}>
-            <Text style={styles.dayTimeText}>{formatFocusTime(totalMinutes)}</Text>
+      <View style={styles.dayGroup}>
+        <TouchableOpacity
+          style={styles.dayHeader}
+          onPress={() => toggleDay(item.dayKey)}
+          activeOpacity={isToday ? 1 : 0.7}
+        >
+          <Text style={styles.dayLabel}>{formatDayLabel(item.dayKey)}</Text>
+          <View style={styles.dayHeaderRight}>
+            <View style={styles.dayTime}>
+              <Text style={styles.dayTimeText}>{formatFocusTime(totalMinutes)}</Text>
+            </View>
+            <View style={styles.dayCount}>
+              <Text style={styles.dayCountText}>{item.records.length} {item.records.length === 1 ? 'pomodoro' : 'pomodoros'}</Text>
+            </View>
+            {!isToday && (
+              <Text style={styles.chevron}>{isCollapsed ? '›' : '⌄'}</Text>
+            )}
           </View>
-          <View style={styles.dayCount}>
-            <Text style={styles.dayCountText}>{item.records.length} {item.records.length === 1 ? 'pomodoro' : 'pomodoros'}</Text>
+        </TouchableOpacity>
+        {!isCollapsed && (
+          <View style={styles.dayRecords}>
+            {item.records.map((record, index) => renderRecord({ item: record, index }))}
           </View>
-        </View>
+        )}
       </View>
-      <View style={styles.dayRecords}>
-        {item.records.map((record, index) => renderRecord({ item: record, index }))}
-      </View>
-    </View>
-  );
-  }, [renderRecord]);
+    );
+  }, [renderRecord, collapsedDays, toggleDay]);
 
   return (
     <LinearGradient colors={[COLORS.bgFrom, COLORS.bgTo]} style={styles.gradient}>
@@ -258,6 +295,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.5)',
     fontSize: 12,
     fontWeight: '600',
+  },
+  chevron: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 18,
+    lineHeight: 20,
+    marginLeft: 2,
   },
   dayLabel: {
     color: '#fff',

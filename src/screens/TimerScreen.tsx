@@ -165,12 +165,12 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
 
           {isRest && isRunning && (
             <TouchableOpacity
-              style={styles.stopButton}
+              style={styles.finishRestButton}
               onPress={timer.finishRest}
               activeOpacity={0.8}
             >
-              <Feather name="check-circle" size={16} color="rgba(255,255,255,0.55)" style={{ marginRight: 8 }} />
-              <Text style={styles.stopButtonText}>Encerrar descanso</Text>
+              <Feather name="check-circle" size={16} color={COLORS.restAccent} style={{ marginRight: 8 }} />
+              <Text style={styles.finishRestButtonText}>Encerrar descanso</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -302,6 +302,23 @@ const styles = StyleSheet.create({
   },
   stopButtonText: {
     color: 'rgba(255,255,255,0.55)',
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  finishRestButton: {
+    flexDirection: 'row',
+    paddingHorizontal: 36,
+    paddingVertical: 14,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: COLORS.restAccent + '60',
+    backgroundColor: COLORS.restAccent + '20',
+  },
+  finishRestButtonText: {
+    color: COLORS.restAccent,
     fontSize: 15,
     fontWeight: '600',
     letterSpacing: 0.3,
