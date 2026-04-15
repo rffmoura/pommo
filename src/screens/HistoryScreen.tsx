@@ -22,6 +22,13 @@ function formatTimeOfDay(isoString: string): string {
   return `${h}:${m}`;
 }
 
+function formatFocusTime(totalMinutes: number): string {
+  if (totalMinutes < 60) return `${totalMinutes}min`;
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
+}
+
 function formatDayLabel(dayKey: string): string {
   const [year, month, day] = dayKey.split('-').map(Number);
   const date = new Date(year, month - 1, day);
@@ -114,19 +121,27 @@ export default function HistoryScreen() {
     </View>
   ), []);
 
-  const renderDay = useCallback(({ item }: { item: DayGroup }) => (
+  const renderDay = useCallback(({ item }: { item: DayGroup }) => {
+    const totalMinutes = item.records.reduce((sum, r) => sum + r.durationMinutes, 0);
+    return (
     <View style={styles.dayGroup}>
       <View style={styles.dayHeader}>
         <Text style={styles.dayLabel}>{formatDayLabel(item.dayKey)}</Text>
-        <View style={styles.dayCount}>
-          <Text style={styles.dayCountText}>{item.records.length} {item.records.length === 1 ? 'pomodoro' : 'pomodoros'}</Text>
+        <View style={styles.dayHeaderRight}>
+          <View style={styles.dayTime}>
+            <Text style={styles.dayTimeText}>{formatFocusTime(totalMinutes)}</Text>
+          </View>
+          <View style={styles.dayCount}>
+            <Text style={styles.dayCountText}>{item.records.length} {item.records.length === 1 ? 'pomodoro' : 'pomodoros'}</Text>
+          </View>
         </View>
       </View>
       <View style={styles.dayRecords}>
         {item.records.map((record, index) => renderRecord({ item: record, index }))}
       </View>
     </View>
-  ), [renderRecord]);
+  );
+  }, [renderRecord]);
 
   return (
     <LinearGradient colors={[COLORS.bgFrom, COLORS.bgTo]} style={styles.gradient}>
@@ -225,6 +240,24 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  dayHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dayTime: {
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  dayTimeText: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    fontWeight: '600',
   },
   dayLabel: {
     color: '#fff',

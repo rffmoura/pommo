@@ -41,6 +41,7 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
   const insets = useSafeAreaInsets();
   const { settings } = useSettings();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isPendingStop, setIsPendingStop] = useState(false);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -76,19 +77,31 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
   const displayProgress = isIdle ? 0 : timer.progress;
 
   const handleStop = useCallback(() => {
+    timer.pause();
+    setIsPendingStop(true);
     Alert.alert(
       'Interromper pomodoro',
       'Tem certeza? O progresso não será salvo.',
       [
-        { text: 'Continuar', style: 'cancel' },
+        {
+          text: 'Continuar',
+          style: 'cancel',
+          onPress: () => {
+            setIsPendingStop(false);
+            timer.resume();
+          },
+        },
         {
           text: 'Parar',
           style: 'destructive',
-          onPress: timer.reset,
+          onPress: () => {
+            setIsPendingStop(false);
+            timer.reset();
+          },
         },
       ]
     );
-  }, [timer.reset]);
+  }, [timer.pause, timer.resume, timer.reset]);
 
   return (
     <LinearGradient colors={[bgFrom, bgTo]} style={styles.gradient}>
@@ -139,10 +152,10 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
             </TouchableOpacity>
           )}
 
-          {isFocus && isRunning && (
+          {isFocus && (isRunning || isPendingStop) && (
             <TouchableOpacity
-              style={styles.stopButton}
-              onPress={handleStop}
+              style={[styles.stopButton, isPendingStop && { opacity: 0.4 }]}
+              onPress={isPendingStop ? undefined : handleStop}
               activeOpacity={0.8}
             >
               <Entypo name="controller-stop" size={16} color="rgba(255,255,255,0.55)" style={{ marginRight: 8 }} />
