@@ -70,8 +70,8 @@ export default function App() {
           <Tab.Screen name="Timer">
             {() => <TimerScreen onRecordAdded={() => setHistoryKey((k) => k + 1)} />}
           </Tab.Screen>
-          <Tab.Screen name="Histórico" key={historyKey}>
-            {() => <HistoryScreen />}
+          <Tab.Screen name="Histórico">
+            {() => <HistoryScreen refreshTrigger={historyKey} />}
           </Tab.Screen>
           <Tab.Screen name="Configurações">
             {() => <SettingsScreen />}

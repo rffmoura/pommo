@@ -143,7 +143,7 @@ export function useTimer({
     startInterval(secs);
 
     const id = await scheduleTimerNotification(
-      'Foco concluído! 🎉',
+      'Foco concluído!',
       'Seu tempo de foco acabou. Hora de descansar.',
       secs
     );
@@ -164,7 +164,7 @@ export function useTimer({
     startInterval(totalSeconds);
 
     const currentPhase = phaseRef.current;
-    const title = currentPhase === 'focus' ? 'Foco concluído! 🎉' : 'Descanso concluído!';
+    const title = currentPhase === 'focus' ? 'Foco concluído!' : 'Descanso concluído!';
     const body = currentPhase === 'focus'
       ? 'Seu tempo de foco acabou. Hora de descansar.'
       : 'Seu descanso acabou. Vamos focar!';

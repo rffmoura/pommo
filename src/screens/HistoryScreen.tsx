@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -66,7 +66,11 @@ interface DayGroup {
   records: PomodoroRecord[];
 }
 
-export default function HistoryScreen() {
+interface HistoryScreenProps {
+  refreshTrigger?: number;
+}
+
+export default function HistoryScreen({ refreshTrigger }: HistoryScreenProps) {
   const insets = useSafeAreaInsets();
   const [groups, setGroups] = useState<DayGroup[]>([]);
   const [totalToday, setTotalToday] = useState(0);
@@ -93,6 +97,10 @@ export default function HistoryScreen() {
       loadRecords();
     }, [loadRecords])
   );
+
+  useEffect(() => {
+    if (refreshTrigger) loadRecords();
+  }, [refreshTrigger, loadRecords]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -138,7 +146,11 @@ export default function HistoryScreen() {
     <View style={styles.recordRow}>
       <View style={styles.recordDot} />
       <View style={styles.recordContent}>
-        <Text style={styles.recordTime}>{formatTimeOfDay(item.finishedAt)}</Text>
+        <Text style={styles.recordTime}>
+          {formatTimeOfDay(item.startedAt)}
+          <Text style={styles.recordTimeSeparator}> → </Text>
+          {formatTimeOfDay(item.finishedAt)}
+        </Text>
         <Text style={styles.recordDuration}>{item.durationMinutes} min de foco</Text>
       </View>
       <View style={styles.recordBadge}>
@@ -345,6 +357,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
+  },
+  recordTimeSeparator: {
+    color: 'rgba(255,255,255,0.25)',
+    fontWeight: '300',
   },
   recordDuration: {
     color: 'rgba(255,255,255,0.4)',
