@@ -3,10 +3,8 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   StatusBar,
-  RefreshControl,
   Alert,
   LayoutAnimation,
   Platform,
@@ -16,55 +14,21 @@ import {
 if (Platform.OS === 'android') {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
 }
+
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { getRecords, groupRecordsByDay, clearRecords, PomodoroRecord } from '../store/pomodoroStore';
 import { COLORS } from '../utils/theme';
+import { DayGroup } from '../types/types';
+import { PeriodChart } from '../components/PeriodChart';
+import { getCurrentWeekDays, getCurrentMonthDays } from '../utils/chartUtils';
+import { TodayView } from '../components/TodayView';
+import { DayList } from '../components/DayList';
 
-function formatTimeOfDay(isoString: string): string {
-  const date = new Date(isoString);
-  const h = String(date.getHours()).padStart(2, '0');
-  const m = String(date.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
-}
+type TabType = 'dia' | 'semana' | 'mes';
 
-function formatFocusTime(totalMinutes: number): string {
-  if (totalMinutes < 60) return `${totalMinutes}min`;
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return m > 0 ? `${h}h ${m}min` : `${h}h`;
-}
-
-function formatDayLabel(dayKey: string): string {
-  const [year, month, day] = dayKey.split('-').map(Number);
-  const date = new Date(year, month - 1, day);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-
-  const isToday =
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear();
-
-  const isYesterday =
-    date.getDate() === yesterday.getDate() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getFullYear() === yesterday.getFullYear();
-
-  if (isToday) return 'Hoje';
-  if (isYesterday) return 'Ontem';
-
-  const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  const months = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-  return `${weekdays[date.getDay()]}, ${day} ${months[month - 1]}`;
-}
-
-interface DayGroup {
-  dayKey: string;
-  records: PomodoroRecord[];
-}
+const WEEK_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 interface HistoryScreenProps {
   refreshTrigger?: number;
@@ -73,30 +37,27 @@ interface HistoryScreenProps {
 export default function HistoryScreen({ refreshTrigger }: HistoryScreenProps) {
   const insets = useSafeAreaInsets();
   const [groups, setGroups] = useState<DayGroup[]>([]);
-  const [totalToday, setTotalToday] = useState(0);
+  const [grouped, setGrouped] = useState<Record<string, PomodoroRecord[]>>({});
+  const [todayRecords, setTodayRecords] = useState<PomodoroRecord[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<TabType>('dia');
   const todayKey = useRef(new Date().toISOString().slice(0, 10));
 
   const loadRecords = useCallback(async () => {
     const records = await getRecords();
-    const grouped = groupRecordsByDay(records.filter((r) => r.type === 'focus'));
-    const sorted = Object.entries(grouped)
+    const g = groupRecordsByDay(records.filter(r => r.type === 'focus'));
+    const sorted = Object.entries(g)
       .sort(([a], [b]) => b.localeCompare(a))
       .map(([dayKey, recs]) => ({ dayKey, records: recs }));
     setGroups(sorted);
-    setTotalToday(grouped[todayKey.current]?.length ?? 0);
-
-    // Collapse all past days by default
+    setGrouped(g);
+    setTodayRecords(g[todayKey.current] ?? []);
     const pastDays = new Set(sorted.map((g) => g.dayKey).filter((k) => k !== todayKey.current));
     setCollapsedDays(pastDays);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadRecords();
-    }, [loadRecords])
-  );
+  useFocusEffect(useCallback(() => { loadRecords(); }, [loadRecords]));
 
   useEffect(() => {
     if (refreshTrigger) loadRecords();
@@ -120,7 +81,8 @@ export default function HistoryScreen({ refreshTrigger }: HistoryScreenProps) {
           onPress: async () => {
             await clearRecords();
             setGroups([]);
-            setTotalToday(0);
+            setGrouped({});
+            setTodayRecords([]);
           },
         },
       ]
@@ -128,7 +90,7 @@ export default function HistoryScreen({ refreshTrigger }: HistoryScreenProps) {
   }, []);
 
   const toggleDay = useCallback((dayKey: string) => {
-    if (dayKey === todayKey.current) return; // today is always open
+    if (dayKey === todayKey.current) return;
     LayoutAnimation.configureNext({
       duration: 250,
       create: { type: 'easeInEaseOut', property: 'opacity' },
@@ -142,70 +104,35 @@ export default function HistoryScreen({ refreshTrigger }: HistoryScreenProps) {
     });
   }, []);
 
-  const renderRecord = useCallback(({ item, index }: { item: PomodoroRecord; index: number }) => (
-    <View style={styles.recordRow}>
-      <View style={styles.recordDot} />
-      <View style={styles.recordContent}>
-        <Text style={styles.recordTime}>
-          {formatTimeOfDay(item.startedAt)}
-          <Text style={styles.recordTimeSeparator}> → </Text>
-          {formatTimeOfDay(item.finishedAt)}
-        </Text>
-        <Text style={styles.recordDuration}>{item.durationMinutes} min de foco</Text>
-      </View>
-      <View style={styles.recordBadge}>
-        <Text style={styles.recordBadgeText}>🍅</Text>
-      </View>
-    </View>
-  ), []);
+  const weekDates = getCurrentWeekDays();
+  const allMonthDates = getCurrentMonthDays();
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7);
 
-  const renderDay = useCallback(({ item }: { item: DayGroup }) => {
-    const totalMinutes = item.records.reduce((sum, r) => sum + r.durationMinutes, 0);
-    const isCollapsed = collapsedDays.has(item.dayKey);
-    const isToday = item.dayKey === todayKey.current;
-    return (
-      <View style={styles.dayGroup}>
-        <TouchableOpacity
-          style={styles.dayHeader}
-          onPress={() => toggleDay(item.dayKey)}
-          activeOpacity={isToday ? 1 : 0.7}
-        >
-          <Text style={styles.dayLabel}>{formatDayLabel(item.dayKey)}</Text>
-          <View style={styles.dayHeaderRight}>
-            <View style={styles.dayTime}>
-              <Text style={styles.dayTimeText}>{formatFocusTime(totalMinutes)}</Text>
-            </View>
-            <View style={styles.dayCount}>
-              <Text style={styles.dayCountText}>{item.records.length} {item.records.length === 1 ? 'pomodoro' : 'pomodoros'}</Text>
-            </View>
-            {!isToday && (
-              <Text style={styles.chevron}>{isCollapsed ? '›' : '⌄'}</Text>
-            )}
-          </View>
-        </TouchableOpacity>
-        {!isCollapsed && (
-          <View style={styles.dayRecords}>
-            {item.records.map((record, index) => renderRecord({ item: record, index }))}
-          </View>
-        )}
-      </View>
-    );
-  }, [renderRecord, collapsedDays, toggleDay]);
+  const weekKeys = new Set(weekDates.map(d => d.toISOString().slice(0, 10)));
+  const weekGroups = groups.filter(g => weekKeys.has(g.dayKey));
+  const monthGroups = groups.filter(g => g.dayKey.startsWith(currentMonthPrefix));
+
+  // Only show bars for days that have data
+  const activeMonthDates = allMonthDates.filter(d => {
+    const key = d.toISOString().slice(0, 10);
+    return (grouped[key]?.length ?? 0) > 0;
+  });
+
+  const n = todayRecords.length;
+  const subtitle = activeTab === 'dia'
+    ? (n > 0 ? `${n} pomodoro${n > 1 ? 's' : ''} hoje` : 'Nenhum pomodoro hoje ainda')
+    : activeTab === 'semana' ? 'Esta semana'
+    : 'Este mês';
 
   return (
     <LinearGradient colors={[COLORS.bgFrom, COLORS.bgTo]} style={styles.gradient}>
       <StatusBar barStyle="light-content" />
-      <View style={[styles.container, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.container, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 90 }]}>
 
-        {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Histórico</Text>
-            <Text style={styles.subtitle}>
-              {totalToday > 0
-                ? `${totalToday} pomodoro${totalToday > 1 ? 's' : ''} hoje`
-                : 'Nenhum pomodoro hoje ainda'}
-            </Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
           </View>
           {groups.length > 0 && (
             <TouchableOpacity onPress={handleClear} activeOpacity={0.7} style={styles.clearBtn}>
@@ -214,23 +141,49 @@ export default function HistoryScreen({ refreshTrigger }: HistoryScreenProps) {
           )}
         </View>
 
-        {groups.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🍅</Text>
-            <Text style={styles.emptyTitle}>Nenhum registro ainda</Text>
-            <Text style={styles.emptySubtitle}>Conclua um pomodoro para{'\n'}começar a registrar seu histórico</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={groups}
-            keyExtractor={(item) => item.dayKey}
-            renderItem={renderDay}
-            contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="rgba(255,255,255,0.4)" />
-            }
-            showsVerticalScrollIndicator={false}
-          />
+        <View style={styles.tabBar}>
+          {(['dia', 'semana', 'mes'] as TabType[]).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
+              onPress={() => setActiveTab(tab)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
+                {tab === 'dia' ? 'Dia' : tab === 'semana' ? 'Semana' : 'Mês'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {activeTab === 'dia' && (
+          <TodayView records={todayRecords} refreshing={refreshing} onRefresh={handleRefresh} />
+        )}
+
+        {activeTab === 'semana' && (
+          <PeriodChart
+            grouped={grouped}
+            dates={weekDates}
+            labelFn={(_, i) => WEEK_LABELS[i]}
+            emptyText="Nenhum foco essa semana"
+          >
+            {weekGroups.length > 0 && (
+              <DayList groups={weekGroups} collapsedDays={collapsedDays} toggleDay={toggleDay} />
+            )}
+          </PeriodChart>
+        )}
+
+        {activeTab === 'mes' && (
+          <PeriodChart
+            grouped={grouped}
+            dates={activeMonthDates}
+            labelFn={(d) => String(d.getDate())}
+            emptyText="Nenhum foco esse mês"
+          >
+            {monthGroups.length > 0 && (
+              <DayList groups={monthGroups} collapsedDays={collapsedDays} toggleDay={toggleDay} />
+            )}
+          </PeriodChart>
         )}
       </View>
     </LinearGradient>
@@ -244,19 +197,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 28,
+    marginBottom: 20,
   },
-  title: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    color: 'rgba(255,255,255,0.45)',
-    fontSize: 14,
-    marginTop: 4,
-  },
+  title: { color: '#fff', fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
+  subtitle: { color: 'rgba(255,255,255,0.45)', fontSize: 14, marginTop: 4 },
   clearBtn: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -266,138 +210,18 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
     marginTop: 4,
   },
-  clearBtnText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  list: {
-    gap: 20,
-  },
-  dayGroup: {
+  clearBtnText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontWeight: '500' },
+  tabBar: {
+    flexDirection: 'row',
     backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 20,
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
-    overflow: 'hidden',
   },
-  dayHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-  },
-  dayHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  dayTime: {
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  dayTimeText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  chevron: {
-    color: 'rgba(255,255,255,0.3)',
-    fontSize: 18,
-    lineHeight: 20,
-    marginLeft: 2,
-  },
-  dayLabel: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  dayCount: {
-    backgroundColor: COLORS.focusAccent + '25',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: COLORS.focusAccent + '40',
-  },
-  dayCountText: {
-    color: COLORS.focusAccent,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  dayRecords: {
-    paddingVertical: 4,
-  },
-  recordRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    gap: 12,
-  },
-  recordDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.focusAccent,
-    opacity: 0.7,
-  },
-  recordContent: {
-    flex: 1,
-  },
-  recordTime: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
-    fontVariant: ['tabular-nums'],
-  },
-  recordTimeSeparator: {
-    color: 'rgba(255,255,255,0.25)',
-    fontWeight: '300',
-  },
-  recordDuration: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 12,
-    marginTop: 1,
-  },
-  recordBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recordBadgeText: {
-    fontSize: 16,
-  },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    marginTop: -60,
-  },
-  emptyIcon: {
-    fontSize: 56,
-    marginBottom: 4,
-  },
-  emptyTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  emptySubtitle: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 15,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
+  tabItem: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
+  tabItemActive: { backgroundColor: 'rgba(255,255,255,0.12)' },
+  tabLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: '600' },
+  tabLabelActive: { color: '#fff' },
 });
