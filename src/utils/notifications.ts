@@ -21,15 +21,17 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 export async function scheduleTimerNotification(
   title: string,
   body: string,
-  seconds: number
+  seconds: number,
+  data?: Record<string, unknown>
 ): Promise<string> {
   await Notifications.cancelAllScheduledNotificationsAsync();
   const id = await Notifications.scheduleNotificationAsync({
     content: {
       title,
       body,
-      sound: true,
+      sound: 'blim.wav',
       priority: Notifications.AndroidNotificationPriority.HIGH,
+      data: data ?? {},
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

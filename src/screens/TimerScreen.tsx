@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -34,9 +34,11 @@ function phaseLabel(phase: TimerPhase): string {
 
 interface TimerScreenProps {
   onRecordAdded?: () => void;
+  autoStartRest?: boolean;
+  onAutoStartHandled?: () => void;
 }
 
-export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
+export default function TimerScreen({ onRecordAdded, autoStartRest, onAutoStartHandled }: TimerScreenProps) {
   useKeepAwake();
   const insets = useSafeAreaInsets();
   const { settings } = useSettings();
@@ -67,6 +69,16 @@ export default function TimerScreen({ onRecordAdded }: TimerScreenProps) {
   const isRest = timer.phase === 'rest';
   const isIdle = timer.phase === 'idle';
   const isRunning = timer.status === 'running';
+
+  useEffect(() => {
+    if (!autoStartRest) return;
+    // Always clear the flag — AppState may have already started rest
+    onAutoStartHandled?.();
+    if (timer.phase === 'idle') {
+      timer.skipToRest();
+      onRecordAdded?.();
+    }
+  }, [autoStartRest]);
 
   const accentColor = isRest ? COLORS.restAccent : COLORS.focusAccent;
   const bgFrom = isRest ? COLORS.restBgFrom : COLORS.bgFrom;

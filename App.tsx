@@ -36,13 +36,27 @@ export default function App() {
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
+  const [autoStartRest, setAutoStartRest] = useState(false);
+
+  const isFocusCompleteNotif = (response: Notifications.NotificationResponse) => {
+    const data = response.notification.request.content.data as Record<string, unknown>;
+    const age = Date.now() - response.notification.date * 1000;
+    return data?.type === 'focus_complete' && age < 2 * 60 * 60 * 1000;
+  };
 
   useEffect(() => {
     setupNotificationChannels();
     requestNotificationPermissions();
 
+    // App was closed and opened via notification tap
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response && isFocusCompleteNotif(response)) setAutoStartRest(true);
+    });
+
     notificationListener.current = Notifications.addNotificationReceivedListener((_n) => {});
-    responseListener.current = Notifications.addNotificationResponseReceivedListener((_r) => {});
+    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (isFocusCompleteNotif(response)) setAutoStartRest(true);
+    });
 
     return () => {
       notificationListener.current?.remove();
@@ -68,7 +82,13 @@ export default function App() {
           })}
         >
           <Tab.Screen name="Timer">
-            {() => <TimerScreen onRecordAdded={() => setHistoryKey((k) => k + 1)} />}
+            {() => (
+              <TimerScreen
+                onRecordAdded={() => setHistoryKey((k) => k + 1)}
+                autoStartRest={autoStartRest}
+                onAutoStartHandled={() => setAutoStartRest(false)}
+              />
+            )}
           </Tab.Screen>
           <Tab.Screen name="Histórico">
             {() => <HistoryScreen refreshTrigger={historyKey} />}

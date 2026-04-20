@@ -48,8 +48,8 @@ export function useTimer({
   const focusStartedAtRef = useRef<string>('');
   const notifIdRef = useRef<string | undefined>(undefined);
   const appStateRef = useRef<AppStateStatus>('active');
+  const isInBackgroundRef = useRef(false); // tracks if app went to background
 
-  // Keep refs so callbacks don't go stale
   const focusMinutesRef = useRef(focusMinutes);
   const restMinutesRef = useRef(restMinutes);
   const onPhaseCompleteRef = useRef(onPhaseComplete);
@@ -69,14 +69,21 @@ export function useTimer({
     }
   }, []);
 
-  // startIntervalRef lets handleComplete call startInterval before it's defined
   const startIntervalRef = useRef<(totalSecs: number) => void>(() => {});
 
-  const handleComplete = useCallback(async (completedPhase: TimerPhase) => {
+  // phaseEndTime: when provided (background recovery), rest starts from that moment
+  const handleComplete = useCallback(async (
+    completedPhase: TimerPhase,
+    silent = false,
+    phaseEndTime?: number,
+  ) => {
     clearTimer();
     await cancelAllNotifications();
-    await playCompletionSound();
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    if (!silent) {
+      await playCompletionSound();
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
 
     if (completedPhase === 'focus') {
       const record = {
@@ -89,23 +96,27 @@ export function useTimer({
       await saveRecord(record);
       onPhaseCompleteRef.current?.('focus');
 
-      // Automatically start rest
-      const secs = restMinutesRef.current * 60;
-      pausedSecondsLeftRef.current = secs;
-      startTimeRef.current = Date.now();
+      const totalRestSecs = restMinutesRef.current * 60;
+
+      // If called from background recovery, account for elapsed time since focus ended
+      const restStartTime = phaseEndTime ?? Date.now();
+      const restElapsed = (Date.now() - restStartTime) / 1000;
+      const restRemaining = Math.max(1, Math.round(totalRestSecs - restElapsed));
+
+      pausedSecondsLeftRef.current = restRemaining;
+      startTimeRef.current = restStartTime;
       setPhase('rest');
       setStatus('running');
-      setSecondsLeft(secs);
-      startIntervalRef.current(secs);
+      setSecondsLeft(restRemaining);
+      startIntervalRef.current(totalRestSecs);
 
       const id = await scheduleTimerNotification(
         'Descanso concluído!',
         'Seu descanso acabou. Vamos focar!',
-        secs
+        restRemaining,
       );
       notifIdRef.current = id;
     } else {
-      // Rest finished — back to idle
       setStatus('idle');
       setPhase('idle');
       setSecondsLeft(focusMinutesRef.current * 60);
@@ -119,7 +130,7 @@ export function useTimer({
     setSecondsLeft(left);
 
     if (left <= 0) {
-      handleComplete(phaseRef.current);
+      handleComplete(phaseRef.current, isInBackgroundRef.current);
     }
   }, [handleComplete]);
 
@@ -128,7 +139,6 @@ export function useTimer({
     intervalRef.current = setInterval(() => tick(totalSecs), 500);
   }, [clearTimer, tick]);
 
-  // Keep the ref in sync
   startIntervalRef.current = startInterval;
 
   const start = useCallback(async () => {
@@ -136,6 +146,7 @@ export function useTimer({
     pausedSecondsLeftRef.current = secs;
     startTimeRef.current = Date.now();
     focusStartedAtRef.current = new Date().toISOString();
+    isInBackgroundRef.current = false;
 
     setPhase('focus');
     setStatus('running');
@@ -145,7 +156,8 @@ export function useTimer({
     const id = await scheduleTimerNotification(
       'Foco concluído!',
       'Seu tempo de foco acabou. Hora de descansar.',
-      secs
+      secs,
+      { type: 'focus_complete' }
     );
     notifIdRef.current = id;
   }, [focusMinutes, startInterval]);
@@ -179,17 +191,19 @@ export function useTimer({
     setPhase('idle');
     setSecondsLeft(focusMinutes * 60);
     pausedSecondsLeftRef.current = focusMinutes * 60;
+    isInBackgroundRef.current = false;
     await cancelAllNotifications();
   }, [clearTimer, focusMinutes]);
 
-  // Ends the rest phase early without discarding the already-saved focus record
   const finishRest = useCallback(async () => {
     clearTimer();
+    isInBackgroundRef.current = false;
+    await cancelAllNotifications();
+    // Set state last to avoid any AppState handler race
     setStatus('idle');
     setPhase('idle');
     setSecondsLeft(focusMinutes * 60);
     pausedSecondsLeftRef.current = focusMinutes * 60;
-    await cancelAllNotifications();
   }, [clearTimer, focusMinutes]);
 
   const skipToRest = useCallback(async () => {
@@ -221,27 +235,36 @@ export function useTimer({
     notifIdRef.current = id;
   }, [clearTimer, focusMinutes, restMinutes, startInterval]);
 
-  // Handle foreground/background transitions
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       const prevState = appStateRef.current;
       appStateRef.current = nextState;
-
-      if (prevState === 'active' && nextState === 'background') {
+      // iOS sequence: active → inactive → background
+      // Clear timer as soon as leaving active (inactive is the first step)
+      if (prevState === 'active' && nextState === 'inactive') {
         clearTimer();
-      } else if (nextState === 'active' && statusRef.current === 'running') {
-        const currentPhase = phaseRef.current;
-        const total = currentPhase === 'focus'
-          ? focusMinutesRef.current * 60
-          : restMinutesRef.current * 60;
-        const elapsed = (Date.now() - startTimeRef.current) / 1000;
-        const left = Math.max(0, Math.round(total - elapsed));
+        isInBackgroundRef.current = true;
+      } else if (nextState === 'background') {
+        clearTimer();
+        isInBackgroundRef.current = true;
+      } else if (nextState === 'active' && prevState !== 'active') {
+        isInBackgroundRef.current = false;
 
-        if (left <= 0) {
-          handleComplete(currentPhase);
-        } else {
-          setSecondsLeft(left);
-          startInterval(total);
+        if (statusRef.current === 'running') {
+          const currentPhase = phaseRef.current;
+          const total = currentPhase === 'focus'
+            ? focusMinutesRef.current * 60
+            : restMinutesRef.current * 60;
+          const elapsed = (Date.now() - startTimeRef.current) / 1000;
+          const left = Math.max(0, Math.round(total - elapsed));
+
+          if (left <= 0) {
+            const phaseEndTime = startTimeRef.current + total * 1000;
+            handleComplete(currentPhase, true, phaseEndTime);
+          } else {
+            setSecondsLeft(left);
+            startInterval(total);
+          }
         }
       }
     });
@@ -249,7 +272,6 @@ export function useTimer({
     return () => subscription.remove();
   }, [clearTimer, startInterval, handleComplete]);
 
-  // Update display when settings change while idle
   useEffect(() => {
     if (statusRef.current === 'idle' && phaseRef.current === 'idle') {
       setSecondsLeft(focusMinutes * 60);

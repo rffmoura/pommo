@@ -56,7 +56,7 @@ function formatDayLabel(dayKey: string): string {
   if (isToday) return 'Hoje';
   if (isYesterday) return 'Ontem';
 
-  const weekdays = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+  const weekdays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const months = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
   return `${weekdays[date.getDay()]}, ${day} ${months[month - 1]}`;
 }

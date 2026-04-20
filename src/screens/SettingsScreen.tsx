@@ -6,14 +6,23 @@ import {
   TouchableOpacity,
   StatusBar,
   ScrollView,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
+import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '../store/SettingsContext';
 import { COLORS } from '../utils/theme';
+import { Feather } from '@expo/vector-icons';
 
 const FOCUS_OPTIONS = [15, 20, 25, 30, 45, 50, 60];
-const REST_OPTIONS = [3, 5, 10, 15, 20];
+const REST_OPTIONS = [5, 10, 20];
 
 interface OptionButtonProps {
   value: number;
@@ -43,11 +52,46 @@ function OptionButton({ value, selected, onPress, unit, accentColor }: OptionBut
   );
 }
 
+interface CustomSliderProps {
+  value: number;
+  max: number;
+  accentColor: string;
+  onChange: (val: number) => void;
+  onComplete: (val: number) => void;
+}
+
+function CustomSlider({ value, max, accentColor, onChange, onComplete }: CustomSliderProps) {
+  return (
+    <View style={styles.sliderContainer}>
+      <View style={styles.sliderLabelRow}>
+        <Text style={[styles.sliderValue, { color: accentColor }]}>{value} min</Text>
+        <Text style={styles.sliderMax}>{max} min</Text>
+      </View>
+      <Slider
+        style={styles.slider}
+        minimumValue={1}
+        maximumValue={max}
+        step={1}
+        value={value}
+        onValueChange={onChange}
+        onSlidingComplete={onComplete}
+        minimumTrackTintColor={accentColor}
+        maximumTrackTintColor="rgba(255,255,255,0.12)"
+        thumbTintColor={accentColor}
+      />
+    </View>
+  );
+}
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { settings, updateSettings } = useSettings();
   const [focusMin, setFocusMin] = useState(settings.focusMinutes);
   const [restMin, setRestMin] = useState(settings.restMinutes);
+  const [customFocusActive, setCustomFocusActive] = useState(false);
+  const [customRestActive, setCustomRestActive] = useState(false);
+  const [sliderFocusVal, setSliderFocusVal] = useState(settings.focusMinutes);
+  const [sliderRestVal, setSliderRestVal] = useState(settings.restMinutes);
 
   useEffect(() => {
     setFocusMin(settings.focusMinutes);
@@ -63,6 +107,30 @@ export default function SettingsScreen() {
     setRestMin(val);
     await updateSettings({ restMinutes: val });
   };
+
+  const animate = () => LayoutAnimation.configureNext({
+    duration: 200,
+    create: { type: 'easeInEaseOut', property: 'opacity' },
+    update: { type: 'easeInEaseOut' },
+    delete: { type: 'easeInEaseOut', property: 'opacity' },
+  });
+
+  const openFocusSlider = () => {
+    animate();
+    setSliderFocusVal(focusMin);
+    setCustomFocusActive(true);
+    setCustomRestActive(false);
+  };
+
+  const openRestSlider = () => {
+    animate();
+    setSliderRestVal(restMin);
+    setCustomRestActive(true);
+    setCustomFocusActive(false);
+  };
+
+  const focusIsCustom = !FOCUS_OPTIONS.includes(focusMin);
+  const restIsCustom = !REST_OPTIONS.includes(restMin);
 
   return (
     <LinearGradient colors={[COLORS.bgFrom, COLORS.bgTo]} style={styles.gradient}>
@@ -92,12 +160,32 @@ export default function SettingsScreen() {
                 key={val}
                 value={val}
                 selected={focusMin === val}
-                onPress={() => handleFocusChange(val)}
+                onPress={() => { handleFocusChange(val); setCustomFocusActive(false); }}
                 unit="min"
                 accentColor={COLORS.focusAccent}
               />
             ))}
+            <TouchableOpacity
+              style={[styles.optionBtn, (focusIsCustom || customFocusActive) && { backgroundColor: COLORS.focusAccent, borderColor: COLORS.focusAccent }]}
+              onPress={customFocusActive ? () => { animate(); setCustomFocusActive(false); } : openFocusSlider}
+              activeOpacity={0.7}
+            >
+              <Feather
+                name={customFocusActive ? 'check' : 'edit-2'}
+                size={15}
+                color={(focusIsCustom || customFocusActive) ? '#fff' : 'rgba(255,255,255,0.45)'}
+              />
+            </TouchableOpacity>
           </View>
+          {customFocusActive && (
+            <CustomSlider
+              value={sliderFocusVal}
+              max={120}
+              accentColor={COLORS.focusAccent}
+              onChange={setSliderFocusVal}
+              onComplete={handleFocusChange}
+            />
+          )}
         </View>
 
         {/* Rest duration */}
@@ -115,12 +203,32 @@ export default function SettingsScreen() {
                 key={val}
                 value={val}
                 selected={restMin === val}
-                onPress={() => handleRestChange(val)}
+                onPress={() => { handleRestChange(val); setCustomRestActive(false); }}
                 unit="min"
                 accentColor={COLORS.restAccent}
               />
             ))}
+            <TouchableOpacity
+              style={[styles.optionBtn, (restIsCustom || customRestActive) && { backgroundColor: COLORS.restAccent, borderColor: COLORS.restAccent }]}
+              onPress={customRestActive ? () => { animate(); setCustomRestActive(false); } : openRestSlider}
+              activeOpacity={0.7}
+            >
+              <Feather
+                name={customRestActive ? 'check' : 'edit-2'}
+                size={15}
+                color={(restIsCustom || customRestActive) ? '#fff' : 'rgba(255,255,255,0.45)'}
+              />
+            </TouchableOpacity>
           </View>
+          {customRestActive && (
+            <CustomSlider
+              value={sliderRestVal}
+              max={100}
+              accentColor={COLORS.restAccent}
+              onChange={setSliderRestVal}
+              onComplete={handleRestChange}
+            />
+          )}
         </View>
 
         {/* Info card */}
@@ -202,6 +310,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.1)',
     alignItems: 'center',
+    justifyContent: 'center',
     minWidth: 58,
   },
   optionBtnValue: {
@@ -220,6 +329,29 @@ const styles = StyleSheet.create({
   },
   optionBtnUnitSelected: {
     color: 'rgba(255,255,255,0.7)',
+  },
+  sliderContainer: {
+    gap: 4,
+  },
+  sliderLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  sliderValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  sliderMax: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.3)',
+    fontVariant: ['tabular-nums'],
+  },
+  slider: {
+    width: '100%',
+    height: 40,
   },
   infoCard: {
     backgroundColor: 'rgba(255,255,255,0.04)',
