@@ -33,7 +33,7 @@ export function PeriodChart({
 
   const barWidth = scrollable
     ? 14
-    : Math.floor((CHART_WIDTH - 40 - (dates.length - 1) * 6) / dates.length);
+    : Math.min(48, Math.floor((CHART_WIDTH - 40 - (dates.length - 1) * 6) / dates.length));
 
   const barData = rawData.map(p => ({
     value: p.value,
