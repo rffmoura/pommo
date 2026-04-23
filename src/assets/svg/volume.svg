@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" id="VolumeLow" x="0" y="0" version="1.1" viewBox="0 0 55 55" enable-background="new 0 0 55 55">
+  <g fill="#000000" class="color000000 svgShape">
+    <g fill="#000000" class="color000000 svgShape">
+      <g fill="#000000" class="color000000 svgShape">
+        <g fill="#000000" class="color000000 svgShape">
+          <g fill="#000000" class="color000000 svgShape">
+            <g fill="#000000" class="color000000 svgShape">
+              <path d="M50.86,23.77c0,10.24-8.3,18.53-18.53,18.53c-10.23,0-18.53-8.29-18.53-18.53
+							c0-10.23,8.3-18.52,18.53-18.52C42.56,5.25,50.86,13.54,50.86,23.77z" fill="#e0afaf" class="colorafdee0 svgShape"></path>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <path d="M42.4,31.33c0,4.36-2.59,7.89-5.79,7.89c-0.07,0-0.14,0-0.21-0.01c-0.13,2.39-0.33,4.79-0.59,7.18
+		c-0.29,2.73-3.32,4.22-5.68,2.84L19.52,43h-8.77c-3.1,0-5.61-2.51-5.61-5.61V26.1c0-3.1,2.51-5.61,5.61-5.61h8.77v-0.01l10.61-6.22
+		c2.36-1.39,5.39,0.1,5.68,2.83c0.23,2.12,0.41,4.24,0.54,6.37c0.09-0.01,0.17-0.01,0.26-0.01C39.81,23.45,42.4,26.98,42.4,31.33z" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" class="colorStroke000000 svgStroke"></path>
+    <path d="M18.52,19.48v22.51H9.75c-3.1,0-5.61-2.51-5.61-5.61V25.09c0-3.1,2.51-5.61,5.61-5.61H18.52z" fill="#ff6b6b" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" class="colorc3f649 svgShape colorStroke000000 svgStroke"></path>
+    <path d="M41.4,30.33c0,4.36-2.59,7.88-5.79,7.88c-3.2,0-5.79-3.53-5.79-7.88c0-4.36,2.59-7.88,5.79-7.88
+		C38.81,22.45,41.4,25.98,41.4,30.33z" fill="#ffffff" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" class="colorffffff svgShape colorStroke000000 svgStroke"></path>
+    <path d="M34.82,45.39c-0.29,2.73-3.32,4.22-5.68,2.83L18.52,42V19.48l10.61-6.22c2.37-1.39,5.4,0.11,5.68,2.83
+		C35.89,25.84,35.87,35.61,34.82,45.39z" fill="#ff6b6b" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" class="colorc3f649 svgShape colorStroke000000 svgStroke"></path>
+    <g fill="#000000" class="color000000 svgShape">
+      <g fill="#000000" class="color000000 svgShape">
+        <path d="M44.51,38.1c-0.13,0-0.26-0.02-0.39-0.06c-0.66-0.21-1.02-0.92-0.8-1.57c1.31-4.04,1.31-8.31,0-12.35
+				c-0.21-0.66,0.15-1.36,0.8-1.57c0.66-0.21,1.36,0.15,1.58,0.8c1.48,4.55,1.48,9.35,0,13.9C45.53,37.76,45.04,38.1,44.51,38.1z" fill="#000000" class="color000000 svgShape"></path>
+      </g>
+    </g>
+    <path d="M8.24,24.48c0.14,1.59,0.26,3.18,0.35,4.77c0.04,0.79,0.17,1.59,0.1,2.38c-0.07,0.79-0.17,1.59-0.45,2.39
+		c-0.01,0.03-0.04,0.04-0.07,0.03c-0.02-0.01-0.03-0.02-0.03-0.03c-0.28-0.8-0.38-1.59-0.45-2.39c-0.07-0.79,0.06-1.59,0.1-2.38
+		c0.09-1.59,0.21-3.18,0.35-4.77c0-0.03,0.03-0.05,0.05-0.05C8.22,24.44,8.24,24.46,8.24,24.48z" fill="#ffffff" class="colorffffff svgShape"></path>
+  </g>
+</svg>

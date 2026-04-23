@@ -4,6 +4,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { VolumeManager } from 'react-native-volume-manager';
 
 import TimerScreen from './src/screens/TimerScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
@@ -11,6 +13,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import { SettingsProvider } from './src/store/SettingsContext';
 import { requestNotificationPermissions, setupNotificationChannels } from './src/utils/notifications';
 import { COLORS } from './src/utils/theme';
+import { VolumeWarningModal } from './src/components/VolumeWarningModal';
 import Feather from '@expo/vector-icons/Feather'
 const Tab = createBottomTabNavigator();
 
@@ -32,16 +35,35 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   );
 }
 
+const VOLUME_WARNING_KEY = 'volumeWarning_neverShow';
+const LOW_VOLUME_THRESHOLD = 0.3;
+
 export default function App() {
   const notificationListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
   const [autoStartRest, setAutoStartRest] = useState(false);
+  const [showVolumeWarning, setShowVolumeWarning] = useState(false);
 
   const isFocusCompleteNotif = (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data as Record<string, unknown>;
     const age = Date.now() - response.notification.date * 1000;
     return data?.type === 'focus_complete' && age < 2 * 60 * 60 * 1000;
+  };
+
+  useEffect(() => {
+    checkVolumeOnLaunch();
+  }, []);
+
+  const checkVolumeOnLaunch = async () => {
+    try {
+      const neverShow = await AsyncStorage.getItem(VOLUME_WARNING_KEY);
+      if (neverShow === 'true') return;
+      const { volume } = await VolumeManager.getVolume();
+      if (volume < LOW_VOLUME_THRESHOLD) setShowVolumeWarning(true);
+    } catch {
+      // volume check is best-effort
+    }
   };
 
   useEffect(() => {
@@ -66,6 +88,14 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
+      <VolumeWarningModal
+        visible={showVolumeWarning}
+        onDismiss={() => setShowVolumeWarning(false)}
+        onNeverShow={async () => {
+          await AsyncStorage.setItem(VOLUME_WARNING_KEY, 'true');
+          setShowVolumeWarning(false);
+        }}
+      />
       <SettingsProvider>
       <NavigationContainer>
         <Tab.Navigator
