@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { VolumeManager } from 'react-native-volume-manager';
@@ -14,7 +14,8 @@ import { SettingsProvider } from './src/store/SettingsContext';
 import { requestNotificationPermissions, setupNotificationChannels } from './src/utils/notifications';
 import { COLORS } from './src/utils/theme';
 import { VolumeWarningModal } from './src/components/VolumeWarningModal';
-import Feather from '@expo/vector-icons/Feather'
+import Feather from '@expo/vector-icons/Feather';
+
 const Tab = createBottomTabNavigator();
 
 function TabIcon({ name, focused }: { name: string; focused: boolean }) {
@@ -52,17 +53,53 @@ export default function App() {
   };
 
   useEffect(() => {
-    checkVolumeOnLaunch();
+    // Pequeno delay pra garantir que o módulo nativo de áudio esteja pronto
+    const timeout = setTimeout(() => {
+      checkVolumeOnLaunch();
+    }, 500);
+    return () => clearTimeout(timeout);
   }, []);
 
   const checkVolumeOnLaunch = async () => {
     try {
+      // console.log('[VolumeCheck] Starting...');
+
       const neverShow = await AsyncStorage.getItem(VOLUME_WARNING_KEY);
-      if (neverShow === 'true') return;
-      const { volume } = await VolumeManager.getVolume();
-      if (volume < LOW_VOLUME_THRESHOLD) setShowVolumeWarning(true);
-    } catch {
-      // volume check is best-effort
+      // console.log('[VolumeCheck] neverShow flag:', neverShow);
+
+      if (neverShow === 'true') {
+        // console.log('[VolumeCheck] User opted out, skipping.');
+        return;
+      }
+
+      // No iOS, garante que estamos lendo o volume de mídia (Playback), não do ringer
+      if (Platform.OS === 'ios') {
+        try {
+          await VolumeManager.setCategory('Playback', false);
+          // console.log('[VolumeCheck] Audio category set to Playback');
+        } catch (categoryError) {
+          console.warn('[VolumeCheck] Failed to set category:', categoryError);
+        }
+      }
+
+      const result = await VolumeManager.getVolume();
+      // console.log('[VolumeCheck] Raw result:', JSON.stringify(result));
+
+      // A lib pode retornar number direto ou { volume: number } dependendo da versão
+      const volume = typeof result === 'number' ? result : result?.volume;
+      // console.log('[VolumeCheck] Parsed volume:', volume, '| threshold:', LOW_VOLUME_THRESHOLD);
+
+      if (typeof volume !== 'number') {
+        console.warn('[VolumeCheck] Volume is not a number, aborting.');
+        return;
+      }
+
+      if (volume < LOW_VOLUME_THRESHOLD) {
+        // console.log('[VolumeCheck] Volume is low, showing modal.');
+        setShowVolumeWarning(true);
+      } 
+    } catch (error) {
+      console.error('[VolumeCheck] Failed:', error);
     }
   };
 
@@ -97,37 +134,35 @@ export default function App() {
         }}
       />
       <SettingsProvider>
-      <NavigationContainer>
-        <Tab.Navigator
-          screenOptions={({ route }) => ({
-            headerShown: false,
-            tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
-            tabBarActiveTintColor: COLORS.focusAccent,
-            tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
-            tabBarStyle: styles.tabBar,
-            tabBarLabelStyle: styles.tabBarLabel,
-            tabBarBackground: () => (
-              <View style={styles.tabBarBg} />
-            ),
-          })}
-        >
-          <Tab.Screen name="Timer">
-            {() => (
-              <TimerScreen
-                onRecordAdded={() => setHistoryKey((k) => k + 1)}
-                autoStartRest={autoStartRest}
-                onAutoStartHandled={() => setAutoStartRest(false)}
-              />
-            )}
-          </Tab.Screen>
-          <Tab.Screen name="Histórico">
-            {() => <HistoryScreen refreshTrigger={historyKey} />}
-          </Tab.Screen>
-          <Tab.Screen name="Configurações">
-            {() => <SettingsScreen />}
-          </Tab.Screen>
-        </Tab.Navigator>
-      </NavigationContainer>
+        <NavigationContainer>
+          <Tab.Navigator
+            screenOptions={({ route }) => ({
+              headerShown: false,
+              tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
+              tabBarActiveTintColor: COLORS.focusAccent,
+              tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
+              tabBarStyle: styles.tabBar,
+              tabBarLabelStyle: styles.tabBarLabel,
+              tabBarBackground: () => <View style={styles.tabBarBg} />,
+            })}
+          >
+            <Tab.Screen name="Timer">
+              {() => (
+                <TimerScreen
+                  onRecordAdded={() => setHistoryKey((k) => k + 1)}
+                  autoStartRest={autoStartRest}
+                  onAutoStartHandled={() => setAutoStartRest(false)}
+                />
+              )}
+            </Tab.Screen>
+            <Tab.Screen name="Histórico">
+              {() => <HistoryScreen refreshTrigger={historyKey} />}
+            </Tab.Screen>
+            <Tab.Screen name="Configurações">
+              {() => <SettingsScreen />}
+            </Tab.Screen>
+          </Tab.Navigator>
+        </NavigationContainer>
       </SettingsProvider>
     </SafeAreaProvider>
   );
